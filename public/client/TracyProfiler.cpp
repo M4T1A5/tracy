@@ -274,6 +274,19 @@ static bool EnsureReadable( uintptr_t address )
 
 #endif  // defined __ANDROID__
 
+#ifdef WIN32
+static bool IsReadable( uintptr_t address )
+{
+    MEMORY_BASIC_INFORMATION memInfo;
+    VirtualQuery( reinterpret_cast<void*>( address ), &memInfo, sizeof( memInfo ) );
+    if ( memInfo.Protect == PAGE_NOACCESS )
+    {
+        return false;
+    }
+    return true;
+}
+#endif // defined WIN32
+
 #ifndef TRACY_DELAYED_INIT
 
 struct InitTimeWrapper
@@ -3922,6 +3935,17 @@ void Profiler::HandleSymbolCodeQuery( uint64_t symbol, uint32_t size )
             return;
         }
 #endif
+
+#ifdef WIN32
+        // When the profiled application is shutdown, some memory areas can
+        // become unreadable and need to be skipped.
+        if( !IsReadable( symbol ) )
+        {
+            AckSymbolCodeNotAvailable();
+            return;
+        }
+#endif
+
         SendLongString( symbol, (const char*)symbol, size, QueueType::SymbolCode );
     }
 }
